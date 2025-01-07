@@ -3,7 +3,7 @@ const path = require('path');
 const app = express();
 
 const logMiddleware = (req, res, next) => {
-    console.log(req.method, res.url);
+    console.log(Date.now(), req.method, res.url);
     next();
 }
 
@@ -24,6 +24,8 @@ app.use((err, req, res, next) => {
     console.log(err);
     res.status(500).send('Internal Server Error');
 })
+
+app.use(logMiddleware);
 
 app.listen(3000, () => {
     console.log('start listening');
