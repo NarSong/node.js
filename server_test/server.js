@@ -1,32 +1,79 @@
+const Redis = require('ioredis');
 const express = require('express');
-const path = require('path');
 const app = express();
 
-const logMiddleware = (req, res, next) => {
-    console.log(Date.now(), req.method, res.url);
-    next();
-}
+const redis = new Redis({
+    port: 6379,
+    host: '192.168.45.111',
+    password : process.env.REDIS_PASSWORD,
+    enableOfflineQueue: false
+})
 
-app.get('/', logMiddleware, (req, res) => {
-    res.status(200).send(req.params.id);
+const init = async () => {
+    await Promise.all([
+        redis.set('users:1', JSON.stringify({id: 1, name: 'alpha'})),
+        redis.set('users:2', JSON.stringify({id: 2, name: 'bravo'})),
+        redis.set('users:3', JSON.stringify({id: 3, name: 'charlie'})),
+        redis.set('users:4', JSON.stringify({id: 4, name: 'delta'})),
+    ]);
+};
+
+app.get('/', (req, res) => {
+    res.status(200).send('hello world\n');
 });
 
-const errorMiddleware = (req, res, next) => {
-    next(new Error('미들웨어 에러'));
-}
-
-app.get('/err', errorMiddleware, (req, res) => {
-    console.log('err 라우트');
-    res.status(200).send('err 라우트');
+app.get('/user/:id', (req, res) => {
+    res.status(200).send(req.params.id);
 })
 
-app.use((err, req, res, next) => {
-    console.log(err);
-    res.status(500).send('Internal Server Error');
-})
+redis.once('ready', async () => {
+    try {
+        await init();
 
-app.use(logMiddleware);
+        app.get('/user/:id', async (req, res) => {
+            try {
+                const key = `users:${req.params.id}`;
+                const val = await redis.get(key);
+                const user = JSON.parse(val);
+                res.status(200).json(user);
+            } catch (err) {
+                console.error(err);
+                res.status(500).send('internal error');
+            }
+        })
 
-app.listen(3000, () => {
-    console.log('start listening');
+        app.get('/users', async (req, res) => {
+            try {
+                const stream = redis.scanStream({
+                    math: 'users:*',
+                    count: 2
+                });
+
+                const users = [];
+                for await (const resultKeys of stream) {
+                    for(const key of resultKeys) {
+                        const value = await redis.get(key);
+                        const user = JSON.parse(value);
+                        users.push(user);
+                    }
+                }
+                res.status(200).json(users);
+            } catch (err) {
+                console.error(err);
+                res.status(500).send('internal error');
+            }
+        })
+
+        app.listen(3000, () => {
+            console.log('start listening')
+        })
+    } catch (err) {
+        console.error(err);
+        process.exit(1);
+    }
+});
+
+redis.on('error', (err) => {
+    console.error(err);
+    process.exit(1);
 });
