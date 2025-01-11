@@ -1,5 +1,6 @@
 const Redis = require('ioredis');
 const express = require('express');
+const path = require('path');
 const app = express();
 
 const redis = new Redis({
@@ -18,8 +19,11 @@ const init = async () => {
     ]);
 };
 
+// ejs를 뷰 엔진으로 지정
+app.set('view engine', 'ejs');
+
 app.get('/', (req, res) => {
-    res.status(200).send('hello world\n');
+    res.render(path.join(__dirname, 'views', 'index.ejs'));
 });
 
 app.get('/user/:id', (req, res) => {
@@ -57,7 +61,7 @@ redis.once('ready', async () => {
                         users.push(user);
                     }
                 }
-                res.status(200).json(users);
+                res.render(path.join(__dirname, 'views', 'users.ejs'), {users: users});
             } catch (err) {
                 console.error(err);
                 res.status(500).send('internal error');
