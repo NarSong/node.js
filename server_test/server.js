@@ -26,6 +26,8 @@ app.get('/', (req, res) => {
     res.render(path.join(__dirname, 'views', 'index.ejs'));
 });
 
+app.use('/static', express.static(path.join(__dirname, 'public')));
+
 app.get('/user/:id', (req, res) => {
     res.status(200).send(req.params.id);
 })
